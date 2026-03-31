@@ -350,149 +350,184 @@ namespace DashAndCollect.Editor
         }
 
         /// <summary>
-        /// Background far — 320x180 sunset sky gradient (Art Bible §12.2).
-        /// Farthest parallax layer: warm orange top → soft turquoise bottom.
-        /// Subtle star/cloud dots.
+        /// Background far — 320x180 TOP-DOWN terrain base (Art Bible §4.4, §12.2).
+        /// Farthest layer: the ground surface seen from above.
+        /// Layout (left to right): beach sand | road shoulder | ROAD (centre) | road shoulder | beach sand.
+        /// Tiles vertically for endless scrolling.
         /// </summary>
         static int GenerateBackgroundFar()
         {
             var tex = new Texture2D(320, 180, TextureFormat.RGBA32, false);
 
-            // Vertical gradient: SkyTop (warm orange) at top → SkyBottom (turquoise) at bottom
+            // Road is ~96px wide in the centre (3 lanes × 16px × 2 = 96 at 16PPU scale).
+            // Shoulders are ~20px each. Rest is beach/terrain.
+            int roadLeft  = 112;  // 320/2 - 48
+            int roadRight = 208;  // 320/2 + 48
+            int shoulderW = 20;
+
             for (int y = 0; y < 180; y++)
             {
-                float t = (float)y / 179f; // 0 at bottom, 1 at top
-                Color32 col = LerpColor(SkyBottom, SkyTop, t);
                 for (int x = 0; x < 320; x++)
-                    tex.SetPixel(x, y, col);
-            }
-
-            // Ocean band at bottom (rows 0-30)
-            for (int y = 0; y < 30; y++)
-            {
-                float t = (float)y / 29f;
-                Color32 col = LerpColor(Hex("1A8A9A"), OceanFar, t);
-                for (int x = 0; x < 320; x++)
-                    tex.SetPixel(x, y, col);
-            }
-            // Horizon highlight line
-            for (int x = 0; x < 320; x++)
-                tex.SetPixel(x, 30, Hex("FFF9C4"));
-
-            // Subtle cloud dots in upper portion
-            int[] cloudX = { 30, 31, 32, 80, 81, 82, 83, 150, 151, 200, 201, 202, 260, 261, 262, 263 };
-            foreach (int cx in cloudX)
-            {
-                if (cx < 320)
                 {
-                    SetPx(tex, cx, 160, Hex("FFCCBC"));
-                    SetPx(tex, cx, 161, Hex("FFCCBC"));
+                    if (x >= roadLeft && x < roadRight)
+                    {
+                        // Road surface
+                        SetPx(tex, x, y, RoadDark);
+                    }
+                    else if (x >= roadLeft - shoulderW && x < roadLeft)
+                    {
+                        // Left shoulder — gravel/sand transition
+                        float t = (float)(x - (roadLeft - shoulderW)) / shoulderW;
+                        SetPx(tex, x, y, LerpColor(Sand, Hex("D7CCC8"), t));
+                    }
+                    else if (x >= roadRight && x < roadRight + shoulderW)
+                    {
+                        // Right shoulder
+                        float t = (float)(x - roadRight) / shoulderW;
+                        SetPx(tex, x, y, LerpColor(Hex("D7CCC8"), Sand, t));
+                    }
+                    else
+                    {
+                        // Beach sand terrain
+                        // Subtle variation using a simple hash
+                        bool variant = ((x * 7 + y * 13) % 5) == 0;
+                        SetPx(tex, x, y, variant ? Hex("FFE0B2") : Sand);
+                    }
                 }
             }
 
-            // Sun glow (simple circle) at upper-right
-            DrawCircleFilled(tex, 270, 150, 12, Hex("FFAB91"));
-            DrawCircleFilled(tex, 270, 150, 8, Hex("FFCC80"));
-            DrawCircleFilled(tex, 270, 150, 4, Hex("FFF9C4"));
+            // Road lane markings — dashed white lines (top-down view)
+            // Two lane dividers at 1/3 and 2/3 across the road
+            int lane1 = roadLeft + 32;
+            int lane2 = roadLeft + 64;
+            for (int y = 0; y < 180; y++)
+            {
+                // Dashed pattern: 12px on, 8px off
+                bool dashOn = (y % 20) < 12;
+                if (dashOn)
+                {
+                    SetPx(tex, lane1, y, LaneLine); SetPx(tex, lane1 + 1, y, LaneLine);
+                    SetPx(tex, lane2, y, LaneLine); SetPx(tex, lane2 + 1, y, LaneLine);
+                }
+            }
+
+            // Road edge lines (solid white)
+            for (int y = 0; y < 180; y++)
+            {
+                SetPx(tex, roadLeft, y, LaneLine);  SetPx(tex, roadLeft + 1, y, LaneLine);
+                SetPx(tex, roadRight - 1, y, LaneLine); SetPx(tex, roadRight - 2, y, LaneLine);
+            }
+
+            // Sparse road surface grit
+            for (int i = 0; i < 40; i++)
+            {
+                int gx = roadLeft + 4 + (i * 37) % 88;
+                int gy = (i * 53) % 180;
+                SetPx(tex, gx, gy, Hex("4A4A4A"));
+            }
 
             SaveSprite(tex, "Background/bg-coastal-far.png");
             return 1;
         }
 
         /// <summary>
-        /// Background mid — 320x180 palm trees and roadside scenery (Art Bible §4.3).
-        /// Middle parallax layer. Mostly transparent with silhouette elements.
+        /// Background mid — 320x180 TOP-DOWN roadside objects (Art Bible §4.3).
+        /// Mostly transparent. Palm tree canopies (green circles from above),
+        /// small shadows, and terrain detail on the sand areas.
         /// </summary>
         static int GenerateBackgroundMid()
         {
             var tex = new Texture2D(320, 180, TextureFormat.RGBA32, false);
             FillClear(tex);
 
-            // Sand strip at bottom (road shoulder)
-            for (int y = 0; y < 20; y++)
-                for (int x = 0; x < 320; x++)
-                    tex.SetPixel(x, y, Sand);
-
-            // Palm trees at intervals
-            int[] treePositions = { 40, 110, 190, 260 };
-            foreach (int tx in treePositions)
+            // Palm tree canopies — seen from above as round green blobs with trunk dot
+            // Only on the sand areas (left of road and right of road)
+            int[][] treeCentres =
             {
-                // Trunk — 2px wide, ~40px tall
-                FillRect(tex, tx, 20, 3, 45, PalmTrunk);
-                FillRect(tex, tx + 1, 20, 1, 45, Hex("A1887F")); // trunk highlight
+                // Left side trees (x < ~92)
+                new[] { 30, 30 }, new[] { 60, 90 }, new[] { 20, 140 }, new[] { 75, 50 }, new[] { 50, 170 },
+                // Right side trees (x > ~228)
+                new[] { 245, 25 }, new[] { 270, 80 }, new[] { 290, 140 }, new[] { 250, 110 }, new[] { 280, 50 },
+            };
 
-                // Foliage — fan of leaves at top
-                int fy = 65;
-                for (int dy = 0; dy < 20; dy++)
-                {
-                    int spread = 6 + dy / 2;
-                    for (int dx = -spread; dx <= spread; dx++)
-                    {
-                        int px = tx + 1 + dx;
-                        int py = fy + dy;
-                        if (px >= 0 && px < 320 && py < 180)
-                        {
-                            bool isEdge = (Mathf.Abs(dx) >= spread - 1);
-                            SetPx(tex, px, py, isEdge ? Hex("388E3C") : PalmFoliage);
-                        }
-                    }
-                }
-                // Drooping leaf tips
-                for (int i = 0; i < 5; i++)
-                {
-                    int lx = tx + 1 - 8 - i;
-                    int ly = 83 - i;
-                    if (lx >= 0 && ly >= 0) SetPx(tex, lx, ly, Hex("388E3C"));
+            foreach (int[] tc in treeCentres)
+            {
+                int cx = tc[0], cy = tc[1];
 
-                    int rx = tx + 1 + 8 + i;
-                    if (rx < 320 && ly >= 0) SetPx(tex, rx, ly, Hex("388E3C"));
-                }
+                // Shadow (offset down-right, darker)
+                DrawCircleFilled(tex, cx + 3, cy - 3, 10, Hex("00000030")); // transparent shadow
+
+                // Canopy — layered circles (top-down palm = irregular round mass)
+                Color32 foliageDark = Hex("388E3C");
+                Color32 foliageLight = PalmFoliage;
+                DrawCircleFilled(tex, cx, cy, 11, foliageDark);
+                DrawCircleFilled(tex, cx, cy, 8, foliageLight);
+                DrawCircleFilled(tex, cx - 3, cy + 2, 5, foliageLight);
+                DrawCircleFilled(tex, cx + 4, cy - 1, 5, foliageLight);
+
+                // Trunk visible through canopy centre (brown dot)
+                DrawCircleFilled(tex, cx, cy, 2, PalmTrunk);
             }
 
-            // Guardrail posts
-            for (int gx = 0; gx < 320; gx += 24)
+            // Beach detail — scattered small shells / rocks (tiny 2px dots on sand areas)
+            int[][] debris =
             {
-                FillRect(tex, gx, 15, 2, 8, PlayerGrey);
-                FillRect(tex, gx, 22, 2, 1, PlayerWhite); // reflector
+                new[] { 15, 60 }, new[] { 80, 20 }, new[] { 45, 110 }, new[] { 10, 155 },
+                new[] { 235, 45 }, new[] { 295, 100 }, new[] { 260, 160 }, new[] { 305, 30 },
+            };
+            foreach (int[] d in debris)
+            {
+                SetPx(tex, d[0], d[1], Hex("BCAAA4"));
+                SetPx(tex, d[0] + 1, d[1], Hex("D7CCC8"));
             }
-            // Guardrail rail
-            FillRect(tex, 0, 20, 320, 1, PlayerGrey);
 
             SaveSprite(tex, "Background/bg-coastal-mid.png");
             return 1;
         }
 
         /// <summary>
-        /// Background near — 320x180 near roadside (Art Bible §4.3).
-        /// Nearest parallax layer: road edge detail, sand, sparse low elements.
-        /// Mostly transparent — must not obscure gameplay lanes.
+        /// Background near — 320x180 TOP-DOWN road shoulder details (Art Bible §4.3).
+        /// Mostly transparent. Guardrail lines running vertically alongside the road,
+        /// small road furniture from above. Must not obscure gameplay lanes.
         /// </summary>
         static int GenerateBackgroundNear()
         {
             var tex = new Texture2D(320, 180, TextureFormat.RGBA32, false);
             FillClear(tex);
 
-            // Low sand dune strip at very bottom only (road edge)
-            for (int y = 0; y < 8; y++)
+            // Guardrails — thin vertical lines running alongside the road edges.
+            // Road spans roughly x=112..208 in the far layer. Guardrails sit just inside the shoulders.
+            int guardLeft = 95;
+            int guardRight = 225;
+
+            // Continuous rail line
+            for (int y = 0; y < 180; y++)
             {
-                Color32 c = LerpColor(Sand, Hex("FFE0B2"), (float)y / 7f);
-                for (int x = 0; x < 320; x++)
-                    tex.SetPixel(x, y, c);
+                SetPx(tex, guardLeft, y, PlayerGrey);
+                SetPx(tex, guardLeft + 1, y, PlayerGrey);
+                SetPx(tex, guardRight, y, PlayerGrey);
+                SetPx(tex, guardRight + 1, y, PlayerGrey);
             }
 
-            // Road edge line (solid white)
-            for (int x = 0; x < 320; x++)
-                tex.SetPixel(x, 8, LaneLine);
-
-            // Small road signs at intervals
-            int[] signPositions = { 70, 200 };
-            foreach (int sx in signPositions)
+            // Rail posts (wider marks every 24px)
+            for (int y = 0; y < 180; y += 24)
             {
-                // Post
-                FillRect(tex, sx, 8, 2, 18, PlayerGrey);
-                // Sign face (green rectangle)
-                FillRect(tex, sx - 4, 24, 10, 6, Hex("2E7D32"));
-                FillRect(tex, sx - 3, 25, 8, 4, Hex("388E3C"));
+                FillRect(tex, guardLeft - 1, y, 4, 3, PlayerWhite);
+                FillRect(tex, guardRight - 1, y, 4, 3, PlayerWhite);
+            }
+
+            // Road shoulder rumble strips (small dashes along inner shoulder)
+            int rumbleLeft = 105;
+            int rumbleRight = 215;
+            for (int y = 0; y < 180; y += 6)
+            {
+                if ((y / 6) % 2 == 0)
+                {
+                    SetPx(tex, rumbleLeft, y, Hex("FFE082"));
+                    SetPx(tex, rumbleLeft, y + 1, Hex("FFE082"));
+                    SetPx(tex, rumbleRight, y, Hex("FFE082"));
+                    SetPx(tex, rumbleRight, y + 1, Hex("FFE082"));
+                }
             }
 
             SaveSprite(tex, "Background/bg-coastal-near.png");
