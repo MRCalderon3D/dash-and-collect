@@ -210,6 +210,11 @@ namespace DashAndCollect
             instance.transform.position = new Vector3(0f, _spawnCursorY, 0f);
             instance.SetActive(true);
 
+            // Re-activate any children that were deactivated on pickup (collectibles).
+            // The pool only reactivates the root; children need explicit reset.
+            foreach (Transform child in instance.transform)
+                child.gameObject.SetActive(true);
+
             ApplySafetyPass(instance);
 
             _activeChunks.Add(new ActiveChunk(instance, def));

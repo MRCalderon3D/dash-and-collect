@@ -35,7 +35,8 @@ namespace DashAndCollect
         private struct TriggerInfo
         {
             public bool            IsHazard;
-            public CollectibleType Type;   // only meaningful when IsHazard == false
+            public CollectibleType Type;       // only meaningful when IsHazard == false
+            public GameObject      SourceObject; // the collectible GameObject to deactivate on pickup
         }
 
         // ── Initialization ──────────────────────────────────────────────────────
@@ -75,7 +76,7 @@ namespace DashAndCollect
 
             var collectible = other.GetComponent<Collectible>();
             if (collectible != null)
-                _triggerBuffer.Add(new TriggerInfo { IsHazard = false, Type = collectible.Type });
+                _triggerBuffer.Add(new TriggerInfo { IsHazard = false, Type = collectible.Type, SourceObject = other.gameObject });
         }
 
         private void Update()
@@ -88,7 +89,13 @@ namespace DashAndCollect
             foreach (var info in _triggerBuffer)
             {
                 if (!info.IsHazard)
+                {
                     OnCollectiblePickedUp?.Invoke(info.Type);
+                    // Deactivate the collectible so it disappears on pickup.
+                    // The chunk pool will re-activate it when the chunk is reused.
+                    if (info.SourceObject != null)
+                        info.SourceObject.SetActive(false);
+                }
             }
 
             // Pass 2 — hazards (only the first hazard per frame matters).

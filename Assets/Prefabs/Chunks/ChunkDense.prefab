@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 7534188184174670822}
   - component: {fileID: 395778336936224414}
   - component: {fileID: 8102473045202893733}
+  - component: {fileID: 1524660941818119557}
   m_Layer: 7
   m_Name: Coin_L1
   m_TagString: Untagged
@@ -152,6 +153,28 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: DashAndCollect.Runtime::DashAndCollect.Collectible
   Type: 3
+--- !u!95 &1524660941818119557
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3034149925841678762}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: 8c883b3f41002a146ad0dc38e188a74e, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &6746251318027055376
 GameObject:
   m_ObjectHideFlags: 0
