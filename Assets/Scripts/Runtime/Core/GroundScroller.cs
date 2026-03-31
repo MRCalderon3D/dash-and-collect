@@ -5,30 +5,23 @@ namespace DashAndCollect
     /// <summary>
     /// Scrolls a tilemap-based ground layer at world speed and wraps seamlessly.
     ///
-    /// Attach to a Grid GameObject whose child Tilemap is painted with repeating
-    /// road tiles. The tilemap must be at least 2x camera height tall.
-    /// The script scrolls the Grid downward and snaps it back when half the
-    /// tilemap has scrolled past, producing infinite seamless road.
+    /// Tiles repeat every 1 world unit (16px at 16 PPU), so the wrap snaps
+    /// back by exactly 1 unit — completely invisible. This keeps the Grid
+    /// position within 1 unit of its start, guaranteeing camera coverage.
     ///
     /// Requires a reference to GameManager for WorldSpeed.
     /// </summary>
+    [DefaultExecutionOrder(2)]
     public sealed class GroundScroller : MonoBehaviour
     {
         [Tooltip("Reference to the GameManager for world speed.")]
         [SerializeField] private GameManager _gameManager;
 
-        [Tooltip("Total painted height of the tilemap in world units.")]
-        [SerializeField] private float _tilemapHeight = 20f;
-
-        private Camera _camera;
-        private float _wrapThreshold;
+        private float _startY;
 
         private void Start()
         {
-            _camera = Camera.main;
-            // Wrap when we've scrolled half the tilemap height — the other half
-            // is still covering the camera so the snap is invisible.
-            _wrapThreshold = _tilemapHeight * 0.5f;
+            _startY = transform.position.y;
         }
 
         private void Update()
@@ -40,10 +33,12 @@ namespace DashAndCollect
             var pos = transform.position;
             pos.y -= dy;
 
-            // Wrap: when we've scrolled down by half the tilemap height,
-            // snap back up. Because the tile pattern repeats, this is seamless.
-            if (pos.y <= -_wrapThreshold)
-                pos.y += _wrapThreshold;
+            // Wrap every 1 unit: tiles repeat each unit so the snap is invisible.
+            // Keeps pos.y within [_startY - 1, _startY], guaranteeing the tilemap
+            // always covers the camera with full margin.
+            float scrolled = _startY - pos.y;
+            if (scrolled >= 1f)
+                pos.y += Mathf.Floor(scrolled);
 
             transform.position = pos;
         }
@@ -53,7 +48,9 @@ namespace DashAndCollect
         /// </summary>
         public void ResetPosition()
         {
-            transform.position = Vector3.zero;
+            var pos = transform.position;
+            pos.y = _startY;
+            transform.position = pos;
         }
 
         /// <summary>

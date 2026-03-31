@@ -134,8 +134,9 @@ namespace DashAndCollect.Editor
                 for (int x = 0; x < TileSize; x++)
                     SetPx(tex, ox + x, y, RoadDark);
 
-            // Dashed lane marking: 2px wide, top half on (rows 8-15), bottom half off (rows 0-7)
-            for (int y = 8; y < TileSize; y++)
+            // Dashed lane marking: 2px wide, short dash at top (rows 12-15), long gap (rows 0-11).
+            // 1:3 ratio makes dashes distinct and easier to track visually at speed.
+            for (int y = 12; y < TileSize; y++)
             {
                 SetPx(tex, ox + 7, y, LaneLine);
                 SetPx(tex, ox + 8, y, LaneLine);

@@ -10,25 +10,15 @@ namespace DashAndCollect.Editor
     /// Paints a scrolling road tilemap into the active scene using the generated
     /// ground tileset (Art Bible §4.2, §4.4).
     ///
-    /// Creates a "Ground" Grid root with a child Tilemap painted as a 3-lane road:
-    ///   left-edge | fill | center | fill | right-edge
-    /// Tiles are painted tall enough (3x camera height) for seamless vertical wrapping.
-    /// Attaches GroundScroller wired to GameManager.
+    /// Reads LaneConfig to align tile columns with gameplay lane positions.
+    /// Layout (7 cols): left-edge | lane1 | marking | lane2 | marking | lane3 | right-edge
+    /// Lane fill tiles are centred on LaneConfig.lanePositions {-2, 0, +2}.
     ///
     /// Menu: Tools → Dash & Collect → Setup Ground
     /// </summary>
     public static class GroundSceneSetup
     {
-        const string TilesDir     = "Assets/Art/Tiles/Ground";
-        const string RuleTilePath = "Assets/Art/Tiles/Ground/ground-road-rule.asset";
-
-        // Road layout: 5 columns wide
-        // Col 0: left-edge    (sand → road boundary)
-        // Col 1: fill         (plain road)
-        // Col 2: center       (road + lane marking)
-        // Col 3: fill         (plain road)
-        // Col 4: right-edge   (road boundary → sand)
-        const int RoadWidthTiles = 5;
+        const string TilesDir = "Assets/Art/Tiles/Ground";
 
         [MenuItem("Tools/Dash & Collect/Setup Ground")]
         public static void Setup()
@@ -36,9 +26,19 @@ namespace DashAndCollect.Editor
             var gameManager = Object.FindFirstObjectByType<GameManager>();
             if (gameManager == null)
             {
-                Debug.LogError("[GroundSceneSetup] No GameManager found in the active scene. Open Game.unity first.");
+                Debug.LogError("[GroundSceneSetup] No GameManager found. Open Game.unity first.");
                 return;
             }
+
+            // Load LaneConfig to get exact lane X positions.
+            var laneConfigs = AssetDatabase.FindAssets("t:LaneConfig");
+            LaneConfig laneConfig = null;
+            if (laneConfigs.Length > 0)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(laneConfigs[0]);
+                laneConfig = AssetDatabase.LoadAssetAtPath<LaneConfig>(path);
+            }
+            float[] lanes = laneConfig != null ? laneConfig.lanePositions : new[] { -2f, 0f, 2f };
 
             // Load tile assets
             var leftEdge  = AssetDatabase.LoadAssetAtPath<TileBase>($"{TilesDir}/ground-left-edge.asset");
@@ -57,16 +57,38 @@ namespace DashAndCollect.Editor
             if (existing != null)
                 Undo.DestroyObjectImmediate(existing);
 
-            // Camera info for sizing.
-            var cam = Camera.main;
-            float camOrtho = cam != null ? cam.orthographicSize : 5f;
-            float camX     = cam != null ? cam.transform.position.x : 0f;
-            float camY     = cam != null ? cam.transform.position.y : 0f;
+            // ── Layout calculation ──────────────────────────────────────────
+            // Each tile = 1 world unit (16px / 16 PPU).
+            // Tile at column C with grid at X=G has left edge at G+C, right at G+C+1, centre at G+C+0.5.
+            //
+            // 7-column layout:
+            //   Col 0: left-edge
+            //   Col 1: fill (lane 1)      — centre must equal lanes[0]
+            //   Col 2: center (marking)   — between lane 1 and 2
+            //   Col 3: fill (lane 2)      — centre must equal lanes[1]
+            //   Col 4: center (marking)   — between lane 2 and 3
+            //   Col 5: fill (lane 3)      — centre must equal lanes[2]
+            //   Col 6: right-edge
+            //
+            // Tile sprites use BottomLeft pivot (0,0). Unity Tilemap places the sprite
+            // pivot at the cell center (anchor 0.5,0.5), so each sprite shifts +0.5
+            // from the cell's left edge.
+            //
+            // Sprite centre for cell C = G + C + 0.5 (cell centre) + 0.5 (pivot shift) = G + C + 1.0
+            // Lane 1 at col 1: G + 1 + 1.0 = G + 2.0  →  G = lanes[0] - 2.0
+            // Lane 2 at col 3: G + 3 + 1.0 = G + 4.0 = lanes[0] + 2.0  ✓ (0 when lanes[0]=-2)
+            // Lane 3 at col 5: G + 5 + 1.0 = G + 6.0 = lanes[0] + 4.0  ✓ (+2 when lanes[0]=-2)
 
-            // Tilemap height: 3x camera height so wrapping is never visible.
-            // Each tile is 1 world unit (16px / 16 PPU). Round up to whole tiles.
+            const int RoadWidthTiles = 7;
+            float gridX = lanes[0] - 2.0f; // = -4.0 for default lanes
+
+            // Camera info for height.
+            var cam = Camera.main;
+            float camY = cam != null ? cam.transform.position.y : 0f;
+            float camOrtho = cam != null ? cam.orthographicSize : 5f;
+
             int tileRows = Mathf.CeilToInt(camOrtho * 2f * 3f);
-            if (tileRows < 30) tileRows = 30; // minimum safety
+            if (tileRows < 30) tileRows = 30;
 
             // Create Grid root
             var gridGO = new GameObject("Ground");
@@ -74,11 +96,7 @@ namespace DashAndCollect.Editor
             var grid = gridGO.AddComponent<Grid>();
             grid.cellSize = new Vector3(1f, 1f, 0f);
             grid.cellLayout = GridLayout.CellLayout.Rectangle;
-
-            // Position the grid so the road is centred on the camera X.
-            // Tile (0,0) is at Grid origin, so offset so the 5-tile-wide road is centred.
-            float roadHalfWidth = RoadWidthTiles * 0.5f;
-            gridGO.transform.position = new Vector3(camX - roadHalfWidth, camY - tileRows * 0.5f, 0f);
+            gridGO.transform.position = new Vector3(gridX, camY - tileRows * 0.5f, 0f);
 
             // Create Tilemap child
             var tmGO = new GameObject("RoadTilemap");
@@ -87,30 +105,28 @@ namespace DashAndCollect.Editor
 
             var tilemap  = tmGO.AddComponent<Tilemap>();
             var renderer = tmGO.AddComponent<TilemapRenderer>();
-            renderer.sortingOrder = -5; // behind gameplay (0), in front of BG_Near (-10)
+            renderer.sortingOrder = -5;
 
-            // Paint the road: 5 columns x tileRows rows
-            TileBase[] columnTiles = { leftEdge, fill, center, fill, rightEdge };
+            // Paint: 7 columns × tileRows
+            TileBase[] columnTiles = { leftEdge, fill, center, fill, center, fill, rightEdge };
 
             for (int y = 0; y < tileRows; y++)
-            {
                 for (int x = 0; x < RoadWidthTiles; x++)
-                {
                     tilemap.SetTile(new Vector3Int(x, y, 0), columnTiles[x]);
-                }
-            }
 
-            // Add GroundScroller for endless scrolling
+            // Log alignment for debugging
+            Debug.Log($"[GroundSceneSetup] Grid X={gridX:F1}. " +
+                      $"Lane centres: {gridX + 2.0f:F1}, {gridX + 4.0f:F1}, {gridX + 6.0f:F1} " +
+                      $"(expected: {lanes[0]}, {lanes[1]}, {lanes[2]})");
+
+            // Add GroundScroller
             var scroller = gridGO.AddComponent<GroundScroller>();
             var so = new SerializedObject(scroller);
             so.FindProperty("_gameManager").objectReferenceValue = gameManager;
-            so.FindProperty("_tilemapHeight").floatValue = tileRows; // 1 tile = 1 world unit
             so.ApplyModifiedPropertiesWithoutUndo();
 
-            // Mark scene dirty
             EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
-
-            Debug.Log($"[GroundSceneSetup] Road tilemap painted ({RoadWidthTiles}x{tileRows} tiles). Save the scene to persist.");
+            Debug.Log($"[GroundSceneSetup] Road tilemap painted ({RoadWidthTiles}x{tileRows}). Save the scene to persist.");
         }
     }
 }

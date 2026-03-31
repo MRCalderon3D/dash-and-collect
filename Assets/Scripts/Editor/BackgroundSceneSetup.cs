@@ -30,7 +30,7 @@ namespace DashAndCollect.Editor
         {
             new LayerDef { Name = "BG_Far",  SpriteFile = "bg-coastal-far.png",  SortingOrder = -30, ParallaxFactor = 0.1f },
             new LayerDef { Name = "BG_Mid",  SpriteFile = "bg-coastal-mid.png",  SortingOrder = -20, ParallaxFactor = 0.4f },
-            new LayerDef { Name = "BG_Near", SpriteFile = "bg-coastal-near.png", SortingOrder = -10, ParallaxFactor = 0.7f },
+            new LayerDef { Name = "BG_Near", SpriteFile = "bg-coastal-near.png", SortingOrder = -10, ParallaxFactor = 1.0f },
         };
 
         [MenuItem("Tools/Dash & Collect/Setup Background")]
