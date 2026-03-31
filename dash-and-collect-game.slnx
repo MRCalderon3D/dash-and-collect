@@ -1,0 +1,6 @@
+﻿<Solution>
+  <Project Path="DashAndCollect.Tests.Runtime.csproj" />
+  <Project Path="DashAndCollect.Runtime.csproj" />
+  <Project Path="DashAndCollect.Tests.Editor.csproj" />
+  <Project Path="DashAndCollect.Editor.csproj" />
+</Solution>

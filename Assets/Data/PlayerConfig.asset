@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ba100ea53bc28e94e8ebf8b642c7a77f, type: 3}
+  m_Name: PlayerConfig
+  m_EditorClassIdentifier: DashAndCollect.Runtime::DashAndCollect.PlayerConfig
+  dashDuration: 0.08
+  recoveryDuration: 0.05
+  laneConfig: {fileID: 11400000, guid: 28b1f8edae0c940418761cac7c721f8f, type: 2}

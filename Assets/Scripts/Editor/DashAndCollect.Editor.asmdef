@@ -1,0 +1,19 @@
+{
+    "name": "DashAndCollect.Editor",
+    "rootNamespace": "DashAndCollect.Editor",
+    "references": [
+        "DashAndCollect.Runtime",
+        "GUID:613783dc1674e844b87788ea74ede0f6"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
