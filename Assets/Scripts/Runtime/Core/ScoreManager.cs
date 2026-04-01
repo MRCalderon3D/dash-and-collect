@@ -36,6 +36,9 @@ namespace DashAndCollect
         private CollectibleType? _chainType;           // null = no chain in progress
         private int              _coinsEarnedThisRun;
         private int              _personalBest;        // session-only until SaveManager (M4)
+
+        /// <summary>Current session personal best. Read by MainMenuController for high score display.</summary>
+        public int PersonalBest => _personalBest;
         private float            _multiplier = 1f;
         private bool             _newPersonalBestFired;
 

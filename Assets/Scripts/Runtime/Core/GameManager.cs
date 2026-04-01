@@ -63,6 +63,9 @@ namespace DashAndCollect
         /// <summary>Fires on Running -> Dead (player died).</summary>
         public event Action OnGameOver;
 
+        /// <summary>Fires on Dead -> Idle (return to main menu).</summary>
+        public event Action OnReturnToMenu;
+
         // ── Internal ────────────────────────────────────────────────────────────
 
         // ScoreManager is plain C# — instantiated here, not serialized (TDD §4.5).
@@ -105,14 +108,13 @@ namespace DashAndCollect
             _collisionHandler.OnPlayerDied          += EndRun;
             _collisionHandler.OnCollectiblePickedUp += _scoreManager.RegisterPickup;
 
-            TransitionTo(RunState.Idle);
+            // Set initial state directly — do not fire OnReturnToMenu on scene load.
+            // Subscribers have not yet connected in their own Awake calls.
+            CurrentState = RunState.Idle;
         }
 
-        private void Start()
-        {
-            // M2 grey-box: auto-start the run. M3 will replace this with a title-screen Start button.
-            StartRun();
-        }
+        // Run is started by MainMenuController.OnPlay() → GameManager.StartRun().
+        // M2 auto-start removed — MainMenu canvas now owns the Idle → Running transition.
 
         private void Update()
         {
@@ -192,6 +194,15 @@ namespace DashAndCollect
             TransitionTo(RunState.Running);
         }
 
+        /// <summary>Dead -> Idle. Returns to main menu state. No-op if not in Dead.</summary>
+        public void ReturnToMenu()
+        {
+            if (CurrentState != RunState.Dead) return;
+            ResetAllSystems();
+            _pendingFirstRun = true; // Next StartRun fires OnGameStart, not OnGameRestart
+            TransitionTo(RunState.Idle);
+        }
+
         // ── Private helpers ─────────────────────────────────────────────────────
 
         /// <summary>
@@ -214,6 +225,9 @@ namespace DashAndCollect
                     break;
                 case RunState.Dead:
                     OnGameOver?.Invoke();
+                    break;
+                case RunState.Idle:
+                    OnReturnToMenu?.Invoke();
                     break;
             }
         }
